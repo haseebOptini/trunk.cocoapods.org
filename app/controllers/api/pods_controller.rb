@@ -37,6 +37,16 @@ module Pod
         end
       end
 
+      def verify_pushes_allowed!
+        unless ENV['TRUNK_APP_PUSH_ALLOWED'] == 'true'
+          json_error(503, 'Push access is currently disabled while we allow ' \
+                          'for owners to claim their Pods. Please read our ' \
+                          'blog posts: ' \
+                          'http://blog.cocoapods.org/CocoaPods-Trunk/ and ' \
+                          'http://blog.cocoapods.org/Claim-Your-Pods/')
+        end
+      end
+
       get '/:name', :requires_owner => false do
         if pod = Pod.find_by_name(params[:name])
           versions = pod.versions.select(&:published?)
@@ -96,13 +106,7 @@ module Pod
       end
 
       post '/', :requires_owner => true do
-        unless ENV['TRUNK_APP_PUSH_ALLOWED'] == 'true'
-          json_error(503, 'Push access is currently disabled while we allow ' \
-                          'for owners to claim their Pods. Please read our ' \
-                          'blog posts: ' \
-                          'http://blog.cocoapods.org/CocoaPods-Trunk/ and ' \
-                          'http://blog.cocoapods.org/Claim-Your-Pods/')
-        end
+        verify_pushes_allowed!
 
         if version = %r{CocoaPods/([0-9a-z\.]+)}i.match(env['User-Agent'])
           if Version.new(version[1]) < MINIMUM_COCOAPODS_VERSION
@@ -170,6 +174,8 @@ module Pod
       end
 
       patch '/:name/deprecated', :requires_owner => true do
+        verify_pushes_allowed!
+
         pod = Pod.find_by_name_and_owner(params[:name], @owner) do
           json_error(403, 'You are not allowed to deprecate this pod.')
         end
@@ -198,6 +204,8 @@ module Pod
       end
 
       delete '/:name/:version', :requires_owner => true do
+        verify_pushes_allowed!
+
         pod = Pod.find_by_name_and_owner(params[:name], @owner) do
           json_error(403, 'You are not allowed to delete this pod.')
         end
